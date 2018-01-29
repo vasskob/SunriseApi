@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">SunriseApi</string>
+    <string name="sunrise_label">Sunrise</string>
+    <string name="sunset_label">Sunset</string>
+</resources>
