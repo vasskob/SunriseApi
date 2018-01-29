@@ -3,5 +3,7 @@
     <string name="sunrise_label">Sunrise</string>
     <string name="sunset_label">Sunset</string>
     <string name="button_settings_title">Settings</string>
-    <string name="permission_message_location"><![CDATA[Allow location permission to show your plase sunrise & sunset]]></string>
+    <string name="permission_message_location">Allow location permission to show your place sunrise and sunset</string>
+    <string name="current_location">Current Place</string>
+    <string name="error_loading_data">Sorry, error occurs</string>
 </resources>
