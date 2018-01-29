@@ -5,6 +5,7 @@ import android.annotation.SuppressLint;
 import android.location.Location;
 import android.os.Bundle;
 import android.support.annotation.Nullable;
+import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -14,7 +15,12 @@ import com.arellomobile.mvp.presenter.InjectPresenter;
 import com.arellomobile.mvp.presenter.PresenterType;
 import com.arellomobile.mvp.presenter.ProvidePresenter;
 import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.common.api.Status;
 import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.location.places.Place;
+import com.google.android.gms.location.places.ui.PlaceAutocompleteFragment;
+import com.google.android.gms.location.places.ui.PlaceSelectionListener;
+import com.google.android.gms.maps.model.LatLng;
 import com.karumi.dexter.Dexter;
 import com.karumi.dexter.PermissionToken;
 import com.karumi.dexter.listener.PermissionDeniedResponse;
@@ -60,9 +66,9 @@ public class MainActivity extends MvpAppCompatActivity implements MainView {
         return mPresenterProvider.get();
     }
 
+    private Place mPlace;
     private PermissionListener mLocationPermissionListener;
     private GoogleApiClient mGoogleApiClient;
-    private Location mLastLocation;
     private PermissionListener mPermissionListener = new PermissionListener() {
 
         @Override
@@ -81,6 +87,15 @@ public class MainActivity extends MvpAppCompatActivity implements MainView {
         }
     };
 
+    private void initGoogleApiClient() {
+        mGoogleApiClient = new GoogleApiClient.Builder(this)
+                .addConnectionCallbacks(mGoogleApiConnectionCallback)
+                .addOnConnectionFailedListener(mGoogleApiOnConnectionFailedListener)
+                .addApi(LocationServices.API).build();
+
+        mGoogleApiClient.connect();
+    }
+
     private GoogleApiClient.ConnectionCallbacks mGoogleApiConnectionCallback = new GoogleApiClient.ConnectionCallbacks() {
         @Override
         public void onConnected(@Nullable Bundle bundle) {
@@ -98,7 +113,7 @@ public class MainActivity extends MvpAppCompatActivity implements MainView {
 
     @SuppressLint("MissingPermission")
     private void getLastKnownLocation() {
-        mLastLocation = LocationServices.FusedLocationApi
+        Location mLastLocation = LocationServices.FusedLocationApi
                 .getLastLocation(mGoogleApiClient);
         Timber.d("getLastKnownLocation: LOCATION = " + mLastLocation);
 
@@ -113,15 +128,6 @@ public class MainActivity extends MvpAppCompatActivity implements MainView {
         Toast.makeText(this, "You device is offLine. Please connect to internet & retry!", Toast.LENGTH_SHORT).show();
     }
 
-    private void initGoogleApiClient() {
-        mGoogleApiClient = new GoogleApiClient.Builder(this)
-                .addConnectionCallbacks(mGoogleApiConnectionCallback)
-                .addOnConnectionFailedListener(mGoogleApiOnConnectionFailedListener)
-                .addApi(LocationServices.API).build();
-
-        mGoogleApiClient.connect();
-    }
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         AndroidInjection.inject(this);
@@ -130,6 +136,7 @@ public class MainActivity extends MvpAppCompatActivity implements MainView {
         ButterKnife.bind(this);
         initPermissionListener();
         requestLocation();
+        initSearch();
     }
 
     private void initPermissionListener() {
@@ -147,9 +154,46 @@ public class MainActivity extends MvpAppCompatActivity implements MainView {
                 .check();
     }
 
+    private void initSearch() {
+        PlaceAutocompleteFragment autocompleteFragment = (PlaceAutocompleteFragment)
+                getFragmentManager().findFragmentById(R.id.place_autocomplete_fragment);
+
+        autocompleteFragment.setOnPlaceSelectedListener(new PlaceSelectionListener() {
+            @Override
+            public void onPlaceSelected(Place place) {
+                LatLng searchedPlace = place.getLatLng();
+                Timber.d("onPlaceSelected: searchedPlace = " + searchedPlace);
+                mPlace = place;
+                mPresenter.getSunData(searchedPlace.latitude, searchedPlace.longitude);
+            }
+
+            @Override
+            public void onError(Status status) {
+                Timber.e("PlaceAutocompleteFragment onError:  " + status);
+            }
+
+        });
+        addCloseListener(autocompleteFragment);
+    }
+
+    private void addCloseListener(PlaceAutocompleteFragment autocompleteFragment) {
+        View fragmentView = autocompleteFragment.getView();
+        if (fragmentView != null) {
+            fragmentView.findViewById(R.id.place_autocomplete_clear_button)
+                    .setOnClickListener(view -> {
+                        mPlace = null;
+                        getLastKnownLocation();
+                        autocompleteFragment.setText("");
+                        view.setVisibility(View.GONE);
+                    });
+        }
+    }
+
     @Override
     public void showSunData(String sunrise, String sunset) {
-        tvPlaceName.setText(getString(R.string.current_location));
+        if (mPlace != null) {
+            tvPlaceName.setText(mPlace.getName());
+        } else tvPlaceName.setText(getString(R.string.current_location));
         tvSunriseTime.setText(sunrise);
         tvSunsetTime.setText(sunset);
     }
@@ -157,5 +201,6 @@ public class MainActivity extends MvpAppCompatActivity implements MainView {
     @Override
     public void showSunDataLoadingError(String errorMsg) {
         Timber.d("showSunDataLoadingError: " + errorMsg);
+        Toast.makeText(this, getString(R.string.error_loading_data),Toast.LENGTH_SHORT).show();
     }
 }
