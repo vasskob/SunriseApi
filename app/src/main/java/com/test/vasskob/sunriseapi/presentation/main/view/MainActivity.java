@@ -1,14 +1,18 @@
-package com.test.vasskob.sunriseapi;
+package com.test.vasskob.sunriseapi.presentation.main.view;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.location.Location;
 import android.os.Bundle;
 import android.support.annotation.Nullable;
-import android.support.v7.app.AppCompatActivity;
 import android.view.ViewGroup;
 import android.widget.TextView;
+import android.widget.Toast;
 
+import com.arellomobile.mvp.MvpAppCompatActivity;
+import com.arellomobile.mvp.presenter.InjectPresenter;
+import com.arellomobile.mvp.presenter.PresenterType;
+import com.arellomobile.mvp.presenter.ProvidePresenter;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.location.LocationServices;
 import com.karumi.dexter.Dexter;
@@ -19,18 +23,42 @@ import com.karumi.dexter.listener.PermissionRequest;
 import com.karumi.dexter.listener.single.CompositePermissionListener;
 import com.karumi.dexter.listener.single.PermissionListener;
 import com.karumi.dexter.listener.single.SnackbarOnDeniedPermissionListener;
+import com.test.vasskob.sunriseapi.R;
+import com.test.vasskob.sunriseapi.presentation.main.presenter.MainPresenter;
+import com.test.vasskob.sunriseapi.utils.NetworkUtils;
+
+import javax.inject.Inject;
+import javax.inject.Provider;
 
 import butterknife.BindView;
 import butterknife.ButterKnife;
+import dagger.android.AndroidInjection;
 import timber.log.Timber;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends MvpAppCompatActivity implements MainView {
 
     @BindView(R.id.rl_container)
     ViewGroup mRootView;
 
     @BindView(R.id.tv_place_name)
     TextView tvPlaceName;
+
+    @BindView(R.id.tv_sunrise_time)
+    TextView tvSunriseTime;
+
+    @BindView(R.id.tv_sunset_time)
+    TextView tvSunsetTime;
+
+    @Inject
+    Provider<MainPresenter> mPresenterProvider;
+
+    @InjectPresenter(type = PresenterType.LOCAL)
+    MainPresenter mPresenter;
+
+    @ProvidePresenter(type = PresenterType.LOCAL)
+    MainPresenter providePresenter() {
+        return mPresenterProvider.get();
+    }
 
     private PermissionListener mLocationPermissionListener;
     private GoogleApiClient mGoogleApiClient;
@@ -73,7 +101,16 @@ public class MainActivity extends AppCompatActivity {
         mLastLocation = LocationServices.FusedLocationApi
                 .getLastLocation(mGoogleApiClient);
         Timber.d("getLastKnownLocation: LOCATION = " + mLastLocation);
-        tvPlaceName.setText(String.format("Lat = %s Lng = %s", mLastLocation.getLatitude(), mLastLocation.getLongitude()));
+
+        if (mLastLocation != null) {
+            if (NetworkUtils.isOnline(this)) {
+                mPresenter.getSunData(mLastLocation.getLatitude(), mLastLocation.getLongitude());
+            } else makeOfflineToast();
+        }
+    }
+
+    private void makeOfflineToast() {
+        Toast.makeText(this, "You device is offLine. Please connect to internet & retry!", Toast.LENGTH_SHORT).show();
     }
 
     private void initGoogleApiClient() {
@@ -87,6 +124,7 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        AndroidInjection.inject(this);
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         ButterKnife.bind(this);
@@ -109,4 +147,15 @@ public class MainActivity extends AppCompatActivity {
                 .check();
     }
 
+    @Override
+    public void showSunData(String sunrise, String sunset) {
+        tvPlaceName.setText(getString(R.string.current_location));
+        tvSunriseTime.setText(sunrise);
+        tvSunsetTime.setText(sunset);
+    }
+
+    @Override
+    public void showSunDataLoadingError(String errorMsg) {
+        Timber.d("showSunDataLoadingError: " + errorMsg);
+    }
 }
