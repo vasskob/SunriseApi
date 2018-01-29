@@ -5,4 +5,6 @@ import com.arellomobile.mvp.MvpView;
 public interface MainView extends MvpView {
     void showSunData(String sunrise, String sunset);
     void showSunDataLoadingError(String errorMsg);
+    void showLoading();
+    void hideLoading();
 }

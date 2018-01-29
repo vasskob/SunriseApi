@@ -24,9 +24,13 @@ public class MainPresenter extends MvpPresenter<MainView> {
 
     public void getSunData(double lat, double lng) {
         mDataRepository.getSunData(lat, lng)
-                .doOnSubscribe(this::addDisposable)
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
+                .doOnSubscribe(disposable -> {
+                    addDisposable(disposable);
+                    getViewState().showLoading();
+                })
+                .doAfterTerminate(() -> getViewState().hideLoading())
                 .subscribe(response -> getViewState().showSunData(response.getSunrise(), response.getSunset()),
                         throwable -> getViewState().showSunDataLoadingError(throwable.getMessage()));
     }

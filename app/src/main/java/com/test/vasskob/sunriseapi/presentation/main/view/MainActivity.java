@@ -2,11 +2,14 @@ package com.test.vasskob.sunriseapi.presentation.main.view;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
+import android.content.pm.PackageManager;
 import android.location.Location;
 import android.os.Bundle;
 import android.support.annotation.Nullable;
+import android.support.v4.app.ActivityCompat;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -54,6 +57,9 @@ public class MainActivity extends MvpAppCompatActivity implements MainView {
 
     @BindView(R.id.tv_sunset_time)
     TextView tvSunsetTime;
+
+    @BindView(R.id.pb_loading)
+    ProgressBar pbLoading;
 
     @Inject
     Provider<MainPresenter> mPresenterProvider;
@@ -161,10 +167,10 @@ public class MainActivity extends MvpAppCompatActivity implements MainView {
         autocompleteFragment.setOnPlaceSelectedListener(new PlaceSelectionListener() {
             @Override
             public void onPlaceSelected(Place place) {
-                LatLng searchedPlace = place.getLatLng();
-                Timber.d("onPlaceSelected: searchedPlace = " + searchedPlace);
+                Timber.d("onPlaceSelected: searchedPlace = " + place);
                 mPlace = place;
-                mPresenter.getSunData(searchedPlace.latitude, searchedPlace.longitude);
+                LatLng placeLatLng = place.getLatLng();
+                mPresenter.getSunData(placeLatLng.latitude, placeLatLng.longitude);
             }
 
             @Override
@@ -201,6 +207,43 @@ public class MainActivity extends MvpAppCompatActivity implements MainView {
     @Override
     public void showSunDataLoadingError(String errorMsg) {
         Timber.d("showSunDataLoadingError: " + errorMsg);
-        Toast.makeText(this, getString(R.string.error_loading_data),Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, getString(R.string.error_loading_data), Toast.LENGTH_SHORT).show();
+    }
+
+    @Override
+    public void showLoading() {
+        pbLoading.setVisibility(View.VISIBLE);
+    }
+
+    @Override
+    public void hideLoading() {
+        pbLoading.setVisibility(View.GONE);
+    }
+
+    @Override
+    protected void onRestart() {
+        super.onRestart();
+        Timber.d("onRestart: ");
+        if (hasFineLocationAccess() && !isGoogleApiClientOK()) {
+            initGoogleApiClient();
+        } else requestLocation();
+    }
+
+    protected boolean hasFineLocationAccess() {
+        int checkSelfPermission = ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION);
+        return checkSelfPermission == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private boolean isGoogleApiClientOK() {
+        return mGoogleApiClient != null && mGoogleApiClient.isConnected();
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (mGoogleApiClient != null && mGoogleApiConnectionCallback != null) {
+            mGoogleApiClient.unregisterConnectionCallbacks(mGoogleApiConnectionCallback);
+        }
+        mGoogleApiClient.disconnect();
+        super.onDestroy();
     }
 }
